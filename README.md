@@ -1,0 +1,2 @@
+# launchtower-sprite-outline
+LaunchTower
