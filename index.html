@@ -83,6 +83,7 @@
       <label>Sprite</label>
       <div class="drop" id="drop">Drop a PNG here or <b>click to browse</b><br><span style="font-size:11px">transparent PNG works best</span></div>
       <input type="file" id="file" accept="image/png,image/webp,image/gif" hidden>
+      <button class="btn" id="loadExample" style="margin-top:10px">✨ Load example sprite</button>
     </div>
     <div class="row">
       <label>Outline color</label>
@@ -172,6 +173,31 @@
   }
 
   fileInput.addEventListener('change',function(){ loadFile(fileInput.files[0]); });
+
+  // --- example sprite: 48x48 pixel-art smiley, drawn in code ---
+  function loadExample(){
+    var S=48, c=document.createElement('canvas');
+    c.width=S; c.height=S;
+    var x=c.getContext('2d');
+    x.clearRect(0,0,S,S);
+    // face (circle)
+    x.fillStyle='#ffd23e';
+    x.beginPath(); x.arc(S/2,S/2,20,0,Math.PI*2); x.fill();
+    // eyes
+    x.fillStyle='#1a1a1a';
+    x.fillRect(14,16,6,8); x.fillRect(28,16,6,8);
+    // smile
+    x.fillRect(12,30,24,4);
+    x.fillRect(8,26,6,4); x.fillRect(34,26,6,4);
+    // blushed cheeks
+    x.fillStyle='#ff8a5c';
+    x.fillRect(10,26,4,3); x.fillRect(34,26,4,3);
+    // export through the EXACT same code path as an uploaded file
+    c.toBlob(function(blob){
+      loadFile(new File([blob],'example.png',{type:'image/png'}));
+    },'image/png');
+  }
+  document.getElementById('loadExample').addEventListener('click',loadExample);
   ['dragover','dragenter'].forEach(function(ev){
     drop.addEventListener(ev,function(e){ e.preventDefault(); drop.classList.add('over'); });
   });
