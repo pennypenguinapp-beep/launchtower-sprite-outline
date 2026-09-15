@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sprite Outline Tool — LaunchTower</title>
+<style>
+  :root{
+    --bg:#0f1117; --panel:#171a23; --panel2:#1d2130; --border:#2a2f42;
+    --text:#e8eaf2; --muted:#8b91a7; --accent:#5b8cff; --accent2:#7c5bff;
+    --ok:#3ecf8e; --err:#ff5b6c;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    background:var(--bg); color:var(--text);
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    min-height:100vh; display:flex; flex-direction:column; align-items:center;
+    padding:24px 16px 40px;
+  }
+  header{width:100%;max-width:960px;margin-bottom:20px}
+  h1{font-size:22px;letter-spacing:.5px;margin-bottom:6px}
+  h1 .tag{color:var(--accent)}
+  p.sub{color:var(--muted);font-size:13px;line-height:1.5}
+  .wrap{width:100%;max-width:960px;display:grid;grid-template-columns:300px 1fr;gap:16px}
+  @media(max-width:760px){.wrap{grid-template-columns:1fr}}
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px}
+  .panel h2{font-size:12px;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin-bottom:14px}
+  .row{margin-bottom:14px}
+  label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px}
+  select,input[type=color],input[type=number]{
+    width:100%;background:var(--panel2);border:1px solid var(--border);color:var(--text);
+    border-radius:8px;padding:8px 10px;font-family:inherit;font-size:14px;
+  }
+  input[type=color]{padding:4px;height:38px;cursor:pointer}
+  .seg{display:flex;gap:6px}
+  .seg button{
+    flex:1;background:var(--panel2);border:1px solid var(--border);color:var(--muted);
+    border-radius:8px;padding:8px 6px;font-family:inherit;font-size:13px;cursor:pointer;
+  }
+  .seg button.active{background:var(--accent);border-color:var(--accent);color:#fff}
+  .drop{
+    border:2px dashed var(--border);border-radius:12px;padding:26px 14px;text-align:center;
+    color:var(--muted);font-size:13px;cursor:pointer;transition:.15s;background:var(--panel2);
+  }
+  .drop:hover,.drop.over{border-color:var(--accent);color:var(--text)}
+  .drop b{color:var(--accent)}
+  .preview{
+    background:
+      linear-gradient(45deg,#1a1e2b 25%,transparent 25%),
+      linear-gradient(-45deg,#1a1e2b 25%,transparent 25%),
+      linear-gradient(45deg,transparent 75%,#1a1e2b 75%),
+      linear-gradient(-45deg,transparent 75%,#1a1e2b 75%);
+    background-size:20px 20px;background-position:0 0,0 10px,10px -10px,-10px 0;
+    background-color:#12141d;
+    border-radius:10px;min-height:280px;display:flex;align-items:center;justify-content:center;
+    overflow:auto;
+  }
+  canvas{image-rendering:pixelated;image-rendering:crisp-edges;display:block}
+  .btn{
+    display:inline-flex;align-items:center;justify-content:center;gap:8px;
+    background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;border:none;
+    border-radius:10px;padding:12px 18px;font-family:inherit;font-size:14px;font-weight:600;
+    cursor:pointer;width:100%;margin-top:6px;
+  }
+  .btn:disabled{opacity:.4;cursor:not-allowed}
+  .status{font-size:12px;margin-top:10px;min-height:16px}
+  .status.ok{color:var(--ok)} .status.err{color:var(--err)}
+  footer{margin-top:28px;font-size:12px;color:var(--muted)}
+  footer a{color:var(--accent);text-decoration:none}
+  .hint{font-size:11px;color:var(--muted);margin-top:6px;line-height:1.5}
+</style>
+</head>
+<body>
+<header>
+  <h1>Sprite <span class="tag">Outline</span> Tool</h1>
+  <p class="sub">Upload a transparent sprite, add a crisp 1px or 2px outline in any color — inside or outside the pixels — preview at zoom, download as PNG. Runs 100% in your browser.</p>
+</header>
+
+<div class="wrap">
+  <div class="panel">
+    <h2>Settings</h2>
+    <div class="row">
+      <label>Sprite</label>
+      <div class="drop" id="drop">Drop a PNG here or <b>click to browse</b><br><span style="font-size:11px">transparent PNG works best</span></div>
+      <input type="file" id="file" accept="image/png,image/webp,image/gif" hidden>
+    </div>
+    <div class="row">
+      <label>Outline color</label>
+      <input type="color" id="color" value="#000000">
+    </div>
+    <div class="row">
+      <label>Width</label>
+      <div class="seg" id="widthSeg">
+        <button data-v="1" class="active">1px</button>
+        <button data-v="2">2px</button>
+      </div>
+    </div>
+    <div class="row">
+      <label>Mode</label>
+      <div class="seg" id="modeSeg">
+        <button data-v="outside" class="active">Outside</button>
+        <button data-v="inside">Inside</button>
+      </div>
+    </div>
+    <div class="row">
+      <label>Preview zoom: <span id="zoomVal">8</span>x</label>
+      <input type="range" id="zoom" min="1" max="32" value="8" style="width:100%;accent-color:var(--accent)">
+    </div>
+    <button class="btn" id="download" disabled>⬇ Download PNG</button>
+    <div class="status" id="status"></div>
+    <p class="hint">Outside mode grows the canvas so the outline never clips. Inside mode paints the outline over the sprite's edge pixels. Output is a clean 1px-per-cell PNG.</p>
+  </div>
+
+  <div class="panel">
+    <h2>Preview</h2>
+    <div class="preview" id="preview">
+      <span style="color:var(--muted);font-size:13px" id="placeholder">Load a sprite to see the outline preview</span>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <a href="https://pennypenguinapp-beep.github.io/" target="_blank" rel="noopener">More LaunchTower tools →</a>
+</footer>
+
+<script>
+(function(){
+  "use strict";
+  var fileInput=document.getElementById('file'),
+      drop=document.getElementById('drop'),
+      colorInput=document.getElementById('color'),
+      widthSeg=document.getElementById('widthSeg'),
+      modeSeg=document.getElementById('modeSeg'),
+      zoomInput=document.getElementById('zoom'),
+      zoomVal=document.getElementById('zoomVal'),
+      downloadBtn=document.getElementById('download'),
+      statusEl=document.getElementById('status'),
+      previewBox=document.getElementById('preview'),
+      placeholder=document.getElementById('placeholder');
+
+  var srcCanvas=null, srcW=0, srcH=0;
+  var width=1, mode='outside';
+
+  function setStatus(msg, cls){ statusEl.textContent=msg; statusEl.className='status'+(cls?' '+cls:''); }
+
+  // --- file loading ---
+  function loadFile(file){
+    if(!file || !file.type.match(/image\/(png|webp|gif)/)){
+      setStatus('Please choose a PNG / WebP / GIF image.','err'); return;
+    }
+    var reader=new FileReader();
+    reader.onload=function(e){
+      var img=new Image();
+      img.onload=function(){
+        srcW=img.naturalWidth; srcH=img.naturalHeight;
+        if(srcW<1||srcH<1||srcW>4096||srcH>4096){
+          setStatus('Image size must be 1–4096px.','err'); return;
+        }
+        srcCanvas=document.createElement('canvas');
+        srcCanvas.width=srcW; srcCanvas.height=srcH;
+        var ctx=srcCanvas.getContext('2d',{willReadFrequently:true});
+        ctx.drawImage(img,0,0);
+        placeholder.style.display='none';
+        downloadBtn.disabled=false;
+        setStatus(srcW+'×'+srcH+' loaded.','ok');
+        render();
+      };
+      img.onerror=function(){ setStatus('Could not decode that image.','err'); };
+      img.src=e.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  fileInput.addEventListener('change',function(){ loadFile(fileInput.files[0]); });
+  ['dragover','dragenter'].forEach(function(ev){
+    drop.addEventListener(ev,function(e){ e.preventDefault(); drop.classList.add('over'); });
+  });
+  ['dragleave','drop'].forEach(function(ev){
+    drop.addEventListener(ev,function(e){ e.preventDefault(); drop.classList.remove('over'); });
+  });
+  drop.addEventListener('drop',function(e){
+    if(e.dataTransfer && e.dataTransfer.files.length) loadFile(e.dataTransfer.files[0]);
+  });
+  drop.addEventListener('click',function(){ fileInput.click(); });
+
+  // --- controls ---
+  widthSeg.addEventListener('click',function(e){
+    var b=e.target.closest('button'); if(!b) return;
+    widthSeg.querySelectorAll('button').forEach(function(x){x.classList.remove('active');});
+    b.classList.add('active'); width=parseInt(b.dataset.v,10); render();
+  });
+  modeSeg.addEventListener('click',function(e){
+    var b=e.target.closest('button'); if(!b) return;
+    modeSeg.querySelectorAll('button').forEach(function(x){x.classList.remove('active');});
+    b.classList.add('active'); mode=b.dataset.v; render();
+  });
+  colorInput.addEventListener('input',render);
+  zoomInput.addEventListener('input',function(){ zoomVal.textContent=zoomInput.value; render(); });
+
+  // --- core: build outlined image at 1px scale ---
+  function hexToRgb(hex){
+    var h=hex.replace('#','');
+    return [parseInt(h.substr(0,2),16),parseInt(h.substr(2,2),16),parseInt(h.substr(4,2),16)];
+  }
+
+  function buildOutlined(){
+    var pad = mode==='outside' ? width : 0;
+    var W=srcW+pad*2, H=srcH+pad*2;
+    var out=document.createElement('canvas');
+    out.width=W; out.height=H;
+    var octx=out.getContext('2d');
+    var src=srcCanvas.getContext('2d',{willReadFrequently:true}).getImageData(0,0,srcW,srcH).data;
+    var img=octx.createImageData(W,H);
+    var d=img.data;
+    var rgb=hexToRgb(colorInput.value);
+
+    function srcAlpha(x,y){
+      if(x<0||y<0||x>=srcW||y>=srcH) return 0;
+      return src[(y*srcW+x)*4+3];
+    }
+    function hasOpaqueInRadius(x,y,r){
+      for(var dy=-r;dy<=r;dy++)for(var dx=-r;dx<=r;dx++){
+        if(srcAlpha(x+dx,y+dy)>0) return true;
+      }
+      return false;
+    }
+
+    for(var y=0;y<H;y++){
+      for(var x=0;x<W;x++){
+        var sx=x-pad, sy=y-pad;
+        var idx=(y*W+x)*4;
+        if(sx>=0&&sy>=0&&sx<srcW&&sy<srcH){
+          var a=src[(sy*srcW+sx)*4+3];
+          if(a>0){
+            // inside mode: edge pixels (any transparent neighbor) become outline color
+            var isEdge=false;
+            if(mode==='inside'){
+              if(sx===0||sy===0||sx===srcW-1||sy===srcH-1) isEdge=true;
+              else{
+                if(srcAlpha(sx-1,sy)===0||srcAlpha(sx+1,sy)===0||
+                   srcAlpha(sx,sy-1)===0||srcAlpha(sx,sy+1)===0) isEdge=true;
+              }
+            }
+            if(isEdge){
+              d[idx]=rgb[0]; d[idx+1]=rgb[1]; d[idx+2]=rgb[2]; d[idx+3]=255;
+            } else {
+              d[idx]=src[(sy*srcW+sx)*4]; d[idx+1]=src[(sy*srcW+sx)*4+1];
+              d[idx+2]=src[(sy*srcW+sx)*4+2]; d[idx+3]=a;
+            }
+          } else if(mode==='outside'){
+            // outside: transparent cell adjacent (within width) to opaque -> outline
+            if(hasOpaqueInRadius(sx,sy,width)){
+              d[idx]=rgb[0]; d[idx+1]=rgb[1]; d[idx+2]=rgb[2]; d[idx+3]=255;
+            }
+          }
+        }
+      }
+    }
+    octx.putImageData(img,0,0);
+    return out;
+  }
+
+  // --- render preview (zoomed) ---
+  function render(){
+    if(!srcCanvas) return;
+    var z=parseInt(zoomInput.value,10);
+    var out=buildOutlined();
+    var prev=document.createElement('canvas');
+    prev.width=out.width*z; prev.height=out.height*z;
+    var pctx=prev.getContext('2d');
+    pctx.imageSmoothingEnabled=false;
+    pctx.drawImage(out,0,0,prev.width,prev.height);
+    // replace old canvas
+    var old=previewBox.querySelector('canvas');
+    if(old) old.remove();
+    previewBox.appendChild(prev);
+  }
+
+  // --- download ---
+  downloadBtn.addEventListener('click',function(){
+    if(!srcCanvas) return;
+    var out=buildOutlined();
+    out.toBlob(function(blob){
+      if(!blob){ setStatus('Export failed.','err'); return; }
+      var url=URL.createObjectURL(blob);
+      var a=document.createElement('a');
+      a.href=url; a.download='sprite-outline-'+out.width+'x'+out.height+'.png';
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(function(){ URL.revokeObjectURL(url); },2000);
+      setStatus('Downloaded '+out.width+'×'+out.height+' PNG.','ok');
+    },'image/png');
+  });
+})();
+</script>
+</body>
+</html>
